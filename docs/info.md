@@ -9,12 +9,16 @@ You can also include images in this folder and reference them in the markdown. E
 
 ## How it works
 
-Explain how your project works
+Fnv-1a 32-bit peripheral: send bytes via write requests, get the hash via a read request. Every read request resets the hash. 
+
+LZC: send up to 32 bits with write request, read back the number of leading zeroes with a read request.
 
 ## How to test
 
-Explain how to use your project
+Fnv-1a: Send a known set of bytes, get a known hash back.
+
+LZC: Send 32 zeros, get the number 32 back. Send 32 1s, get 0 back
 
 ## External hardware
 
-List external hardware used in your project (e.g. PMOD, LED display, etc), if any
+i2c master device with test code
