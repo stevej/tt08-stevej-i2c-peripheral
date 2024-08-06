@@ -18,7 +18,7 @@ jobs:
       - name: Run formal tests
         shell: bash
         run: |
-          sby -f formal_bmc.sby
-          sby -f formal_prove.sby
-          sby -f formal_cover.sby
+          sby -f src/formal_bmc.sby
+          sby -f src/formal_prove.sby
+          sby -f src/formal_cover.sby
 
