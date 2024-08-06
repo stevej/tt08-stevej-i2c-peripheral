@@ -16,22 +16,17 @@ module fnv_1a_32_formal (
       .out(out)
   );
 
-  reg f_past_valid;
-
 `ifdef FORMAL
-  logic f_past_value;
+  logic f_past_valid;
 
   initial begin
     f_past_valid = 0;
     reset = 1;
   end
 
-  always_comb if (!f_past_valid) assume (reset);
-  /*
-  always @(posedge sck) begin
-    if (!reset) f_past_valid = 1;
+  always_comb begin
+    if (!f_past_valid) assume (reset);
   end
-  */
 
   always @(posedge sck) begin
     if (f_past_valid) begin
