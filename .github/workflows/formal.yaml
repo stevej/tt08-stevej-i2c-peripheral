@@ -16,9 +16,10 @@ jobs:
         uses: YosysHQ/setup-oss-cad-suite@v3
 
       - name: Run formal tests
+        working_directory: ./src
         shell: bash
         run: |
-          sby -f src/formal_bmc.sby
-          sby -f src/formal_prove.sby
-          sby -f src/formal_cover.sby
+          sby -f formal_bmc.sby
+          sby -f formal_prove.sby
+          sby -f formal_cover.sby
 
