@@ -19,7 +19,6 @@ project:
   source_files:
     - "project.v"
     - "fnv_1a_32.v"
-    - "lzc.v"
     - "byte_transmitter.v"
     - "byte_receiver.v"
     - "i2c_periph.v"
