@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-`default_nettype none
+`default_nettype none `timescale 1us / 100 ns
+
+`include "i2c_periph.v"
 
 module tt_um_i2c_peripheral_stevej (
     input  wire [7:0] ui_in,    // Dedicated inputs
@@ -21,7 +23,23 @@ module tt_um_i2c_peripheral_stevej (
   assign uio_out = 0;
   assign uio_oe  = 0;
 
+  /**
+   * TinyTapeout pinout
+   * uio[0] - (INT) -- unused in our design
+   * uio[1] - (RESET)
+   * uio[2] - SCL
+   * uio[3] - SDA
+   **/
+
+  i2c_periph i2c_periph (
+      .clk(uio_in[2]),
+      .reset(~uio_in[1] | ~rst_n),
+      .read_channel(uio_in[6]),
+      .direction(uio_oe),
+      .write_channel(uio_out[6])
+  );
+
   // List all unused inputs to prevent warnings
-  wire _unused = &{ena, clk, rst_n, 1'b0};
+  wire _unused = &{ena, clk, 1'b0};
 
 endmodule

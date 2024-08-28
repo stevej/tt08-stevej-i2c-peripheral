@@ -7,6 +7,7 @@ module lzc_formal (
     output logic [31:0] out
 );
 
+  /* verilator lint_off WIDTHEXPAND */
   lzc lzc (
       .in (in),
       .out(out)
