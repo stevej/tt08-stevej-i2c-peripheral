@@ -9,9 +9,9 @@
 module i2c_periph (
     input clk,
     input reset,
-    input wire read_channel,  // was sda
+    input read_channel,
     output reg [7:0] direction,  // set to the correct mask before using write_channel
-    output write_channel  // was datum
+    output write_channel
 );
 
   localparam [3:0] Stop = 4'b0001;
@@ -62,7 +62,7 @@ module i2c_periph (
       current_state <= Stop;
       last_sda <= 0;
       byte_count <= 0;
-      byte_buffer = 8'b0000_0000;
+      byte_buffer <= 8'b0000_0000;
       byte_receiver_enable <= 0;
       byte_transmitter_enable <= 0;
       address <= 7'b000_0000;
@@ -71,7 +71,9 @@ module i2c_periph (
     end else begin
       case (current_state)
         Stop: begin
-          if (last_sda == 0 && read_channel == 1) current_state <= Start;
+          if (last_sda == 0 && read_channel == 1) begin
+            current_state <= Start;
+          end
         end
         Start: begin
           if (address > 7'b000_0000) begin
@@ -86,9 +88,7 @@ module i2c_periph (
             byte_count <= byte_count + 1;
           end else begin
             direction <= WriteMask;
-            //write_channel <= 1;  // was sda
             address <= byte_buffer[7:1];
-            //read_write <= byte_buffer[0];
             current_state <= Dispatch;
           end
         end
@@ -105,14 +105,14 @@ module i2c_periph (
         OneZeroPeriph: begin
           // todo: check that the direction is read.
           direction <= WriteMask;
-          byte_buffer = one_zero;
+          byte_buffer <= one_zero;
           byte_count <= 0;
           current_state <= WriteBuffer;
         end
         ZeroOnePeriph: begin
           // todo: check that the direction is read.
           direction <= WriteMask;
-          byte_buffer = zero_one;
+          byte_buffer <= zero_one;
           byte_count <= 0;
           current_state <= WriteBuffer;
         end

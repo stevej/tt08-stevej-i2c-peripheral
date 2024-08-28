@@ -10,13 +10,13 @@ module fnv_1a_32 (
     output wire [31:0] out
 );
 
-  parameter bit [31:0] OFFSET_BASIS = 32'd2166136261;
-  parameter bit [31:0] FNV_PRIME = 32'd16777619;
+  parameter [31:0] OFFSET_BASIS = 32'd2166136261;
+  parameter [31:0] FNV_PRIME = 32'd16777619;
 
   reg [31:0] hash;
 
   /**
-    * Original fnv-1a algorithm
+    * FNV-1a algorithm
     * ----
     * hash = offset_basis
     * for each octet_of_data to be hashed
