@@ -33,7 +33,9 @@ module i2c_periph (
   reg [6:0] address;
   // Keeps track of how many bytes have been written or read.
   reg [3:0] byte_count;
-  reg [7:0] byte_buffer;
+  reg [7:0] output_byte_buffer;
+  reg [7:0] input_byte_buffer;
+  reg read_request;
 
   reg byte_receiver_enable;
   byte_receiver byte_receiver (
@@ -41,7 +43,7 @@ module i2c_periph (
       .reset(reset),
       .enable(byte_receiver_enable),
       .in(read_channel),
-      .out(byte_buffer)
+      .out(output_byte_buffer)
   );
 
   reg byte_transmitter_enable;
@@ -49,7 +51,7 @@ module i2c_periph (
       .clk(clk),
       .reset(reset),
       .enable(byte_transmitter_enable),
-      .in(byte_buffer),
+      .in(input_byte_buffer),
       .out(write_channel)
   );
 
@@ -62,7 +64,8 @@ module i2c_periph (
       current_state <= Stop;
       last_sda <= 0;
       byte_count <= 0;
-      byte_buffer <= 8'b0000_0000;
+      input_byte_buffer <= 8'b0000_0000;
+      output_byte_buffer <= 8'b0000_0000;
       byte_receiver_enable <= 0;
       byte_transmitter_enable <= 0;
       address <= 7'b000_0000;
@@ -88,36 +91,43 @@ module i2c_periph (
             byte_count <= byte_count + 1;
           end else begin
             direction <= WriteMask;
-            address <= byte_buffer[7:1];
+            address <= output_byte_buffer[7:1];
+            read_request <= output_byte_buffer[0];
             current_state <= Dispatch;
           end
         end
         // Now that we have the address, we can read and write bytes per each peripherals needs.
         Dispatch: begin
-          case (address)
-            7'h55:   current_state <= OneZeroPeriph;
-            7'h2A:   current_state <= ZeroOnePeriph;
-            7'h3F:   current_state <= Fnv1aPeriph;
-            default: current_state <= LzcPeriph;
-          endcase
+          if (read_request) begin
+            case (address)
+              7'h55:   current_state <= OneZeroPeriph;
+              7'h2A:   current_state <= ZeroOnePeriph;
+              7'h3F:   current_state <= Fnv1aPeriph;
+              default: current_state <= LzcPeriph;
+            endcase
+          end else begin
+          end
         end
         // Will this break because I'm not doing anything with the ACK after a byte?
         OneZeroPeriph: begin
           // todo: check that the direction is read.
           direction <= WriteMask;
-          byte_buffer <= one_zero;
+          input_byte_buffer <= one_zero;
+          byte_transmitter_enable <= 1;
           byte_count <= 0;
           current_state <= WriteBuffer;
         end
         ZeroOnePeriph: begin
           // todo: check that the direction is read.
           direction <= WriteMask;
-          byte_buffer <= zero_one;
+          input_byte_buffer <= zero_one;
+          byte_transmitter_enable <= 1;
           byte_count <= 0;
           current_state <= WriteBuffer;
         end
         WriteBuffer: begin
           if (byte_count == 8) begin
+            byte_transmitter_enable <= 0;
             current_state <= Stop;
           end else begin
             byte_count <= byte_count + 1;

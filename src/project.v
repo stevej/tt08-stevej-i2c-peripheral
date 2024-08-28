@@ -19,12 +19,13 @@ module tt_um_i2c_peripheral_stevej (
 );
 
   // All output pins must be assigned. If not used, assign to 0.
-  assign uo_out  = ui_in + uio_in;  // Example: ou_out is the sum of ui_in and uio_in
-  assign uio_out = 0;
-  assign uio_oe  = 0;
+  assign uo_out = ui_in + uio_in;  // Example: ou_out is the sum of ui_in and uio_in
+  wire sda;
+  assign uio_out = {1'b0, sda, 6'b00_0000};
+  //assign uio_oe = 0;
 
   /**
-   * TinyTapeout pinout
+   * TinyTapeout pinout for I2C
    * uio[0] - (INT) -- unused in our design
    * uio[1] - (RESET)
    * uio[2] - SCL
@@ -36,7 +37,7 @@ module tt_um_i2c_peripheral_stevej (
       .reset(~uio_in[1] | ~rst_n),
       .read_channel(uio_in[6]),
       .direction(uio_oe),
-      .write_channel(uio_out[6])
+      .write_channel(sda)
   );
 
   // List all unused inputs to prevent warnings
