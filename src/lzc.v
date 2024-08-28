@@ -8,7 +8,7 @@ module enc (
     output reg  [1:0] out
 );
 
-  always_comb begin
+  always @* begin
     case (in[1:0])
       2'b00:   out = 2'b10;
       2'b01:   out = 2'b01;
