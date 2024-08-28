@@ -13,12 +13,18 @@ Fnv-1a 32-bit peripheral: send bytes via write requests, get the hash via a read
 
 LZC: send up to 32 bits with write request, read back the number of leading zeroes with a read request.
 
+ZeroOne: Sends the byte 0101_0101
+
+OneZero: Sends the byte 1010_1010
+
 ## How to test
 
 Fnv-1a: Send a known set of bytes, get a known hash back.
 
 LZC: Send 32 zeros, get the number 32 back. Send 32 1s, get 0 back
 
+ZeroOne/OneZero: make a read request.
+
 ## External hardware
 
-i2c master device with test code
+i2c master device with test code. Arduino test code provided.
