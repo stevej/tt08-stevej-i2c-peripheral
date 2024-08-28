@@ -33,8 +33,8 @@ module i2c_periph (
   reg [6:0] address;
   // Keeps track of how many bytes have been written or read.
   reg [3:0] byte_count;
-  reg [7:0] output_byte_buffer;
   reg [7:0] input_byte_buffer;
+  reg [7:0] output_byte_buffer;
   reg read_request;
 
   reg byte_receiver_enable;
@@ -65,7 +65,6 @@ module i2c_periph (
       last_sda <= 0;
       byte_count <= 0;
       input_byte_buffer <= 8'b0000_0000;
-      output_byte_buffer <= 8'b0000_0000;
       byte_receiver_enable <= 0;
       byte_transmitter_enable <= 0;
       address <= 7'b000_0000;
@@ -90,7 +89,7 @@ module i2c_periph (
           if (byte_count < 8) begin
             byte_count <= byte_count + 1;
           end else begin
-            direction <= WriteMask;
+            direction <= WriteMask;  // should this be here?
             address <= output_byte_buffer[7:1];
             read_request <= output_byte_buffer[0];
             current_state <= Dispatch;
