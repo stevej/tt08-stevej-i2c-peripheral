@@ -3,6 +3,7 @@
 .vscode
 *.vcd
 runs
+tt08_*_tb
 tt_submission
 src/user_config.json
 src/config_merged.json

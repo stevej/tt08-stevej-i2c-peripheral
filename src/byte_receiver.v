@@ -11,16 +11,30 @@ module byte_receiver (
     input reset,
     input enable,
     input in,
-    output reg [7:0] out  // byte_buffer
+    output [7:0] out  // byte_buffer
 );
+
+  reg [7:0] r_out;
+  assign out = r_out;
+`ifdef SIMULATION
+  reg running;
+`endif
 
   always @(posedge clk) begin
     if (reset) begin
-      out <= 8'b0;
+      r_out <= 8'b0000_0000;
+`ifdef SIMULATION
+      running <= 0;
+`endif
     end else begin
       if (enable) begin
-        out[7:1] <= out[6:0];
-        out[0]   <= in;
+        r_out[7:1] <= r_out[6:0];
+        r_out[0]   <= in;
+`ifdef SIMULATION
+        running <= 1;
+`endif
+      end else begin
+        r_out <= 8'b0000_0000;
       end
     end
   end

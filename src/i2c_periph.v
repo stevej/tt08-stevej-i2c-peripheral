@@ -5,37 +5,48 @@
 
 `include "byte_transmitter.v"
 `include "byte_receiver.v"
+`include "mux_2_1.v"
 
 module i2c_periph (
-    input clk,
+    input clk,  // using SCL for our clock.
     input reset,
     input read_channel,
     output reg [7:0] direction,  // set to the correct mask before using write_channel
     output write_channel
 );
 
-  localparam [3:0] Stop = 4'b0001;
-  localparam [3:0] Start = 4'b0010;
-  localparam [3:0] Dispatch = 4'b0011;
-  localparam [3:0] AddressAndRw = 4'b0100;
-  localparam [3:0] OneZeroPeriph = 4'b0101;
-  localparam [3:0] ZeroOnePeriph = 4'b0110;
-  localparam [3:0] Fnv1aPeriph = 4'b0111;
-  localparam [3:0] LzcPeriph = 4'b1000;
-  localparam [3:0] WriteBuffer = 4'b1001;
-  localparam [3:0] Reset = 4'b1010;
+  localparam [3:0] Stop = 4'b0001;  // 1
+  localparam [3:0] Start = 4'b0010;  // 2
+  localparam [3:0] AddressAndRw = 4'b0011;  // 3
+  localparam [3:0] Dispatch = 4'b0100;  // 4
+  localparam [3:0] OneZeroPeriph = 4'b0101;  // 5
+  localparam [3:0] ZeroOnePeriph = 4'b0110;  // 6
+  localparam [3:0] Fnv1aPeriph = 4'b0111;  // 7
+  localparam [3:0] WriteBuffer = 4'b1001;  // 9
+  localparam [3:0] Reset = 4'b1010;  // 10
+  localparam [3:0] BadAddress = 4'b1011;  // 11
 
   localparam [7:0] ReadMask = 8'b0000_0000;
-  localparam [7:0] WriteMask = 8'b0010_0000;
+  localparam [7:0] WriteMask = 8'b0010_0000;  // 20
 
   reg [3:0] current_state;
   reg last_sda;
-  reg [6:0] address;
+  reg [6:0] address;  // device address decoded from SDA line
   // Keeps track of how many bytes have been written or read.
   reg [3:0] byte_count;
-  reg [7:0] input_byte_buffer;
-  reg [7:0] output_byte_buffer;
+  reg [7:0] transmitter_byte_buffer;
+  reg [7:0] receiver_byte_buffer;
   reg read_request;
+  reg transmitter_channel;
+  reg ack_channel;
+
+  reg r_output_selector_transmitter;  // 1 means transmitter, 0 means send an ack
+  mux_2_1 output_mux (
+      .one(transmitter_channel),
+      .two(ack_channel),
+      .selector(r_output_selector_transmitter),
+      .out(write_channel)
+  );
 
   reg byte_receiver_enable;
   byte_receiver byte_receiver (
@@ -43,7 +54,7 @@ module i2c_periph (
       .reset(reset),
       .enable(byte_receiver_enable),
       .in(read_channel),
-      .out(output_byte_buffer)
+      .out(receiver_byte_buffer)
   );
 
   reg byte_transmitter_enable;
@@ -51,8 +62,8 @@ module i2c_periph (
       .clk(clk),
       .reset(reset),
       .enable(byte_transmitter_enable),
-      .in(input_byte_buffer),
-      .out(write_channel)
+      .in(transmitter_byte_buffer),
+      .out(transmitter_channel)
   );
 
   reg [7:0] one_zero;
@@ -60,11 +71,13 @@ module i2c_periph (
 
   always @(posedge clk) begin
     if (reset) begin
+      r_output_selector_transmitter <= 1;
+      read_request <= 0;
       direction <= ReadMask;
       current_state <= Stop;
       last_sda <= 0;
       byte_count <= 0;
-      input_byte_buffer <= 8'b0000_0000;
+      transmitter_byte_buffer <= 8'b0000_0000;
       byte_receiver_enable <= 0;
       byte_transmitter_enable <= 0;
       address <= 7'b000_0000;
@@ -75,6 +88,8 @@ module i2c_periph (
         Stop: begin
           if (last_sda == 0 && read_channel == 1) begin
             current_state <= Start;
+          end else begin
+            current_state <= Stop;
           end
         end
         Start: begin
@@ -89,9 +104,13 @@ module i2c_periph (
           if (byte_count < 8) begin
             byte_count <= byte_count + 1;
           end else begin
-            direction <= WriteMask;  // should this be here?
-            address <= output_byte_buffer[7:1];
-            read_request <= output_byte_buffer[0];
+            direction <= WriteMask;
+            r_output_selector_transmitter <= 0;
+            ack_channel <= 1;  // sending ACK
+            r_output_selector_transmitter <= 1;
+            address <= receiver_byte_buffer[7:1];
+            read_request <= receiver_byte_buffer[0];
+            byte_receiver_enable <= 0;
             current_state <= Dispatch;
           end
         end
@@ -99,19 +118,28 @@ module i2c_periph (
         Dispatch: begin
           if (read_request) begin
             case (address)
-              7'h55:   current_state <= OneZeroPeriph;
-              7'h2A:   current_state <= ZeroOnePeriph;
+              7'h2A: begin  // This is our ZeroOnePeriph peripheral.
+                direction <= WriteMask;
+                transmitter_byte_buffer <= zero_one;
+                byte_transmitter_enable <= 1;
+                byte_count <= 0;
+                current_state <= WriteBuffer;
+              end
+              7'h55:   current_state <= ZeroOnePeriph;
               7'h3F:   current_state <= Fnv1aPeriph;
-              default: current_state <= LzcPeriph;
+              default: current_state <= BadAddress;
             endcase
           end else begin
+            // We don't support write requests at this stage of development but it would be here.
+            // enable receiver and read some bytes.
+            current_state <= Dispatch;
           end
         end
         // Will this break because I'm not doing anything with the ACK after a byte?
         OneZeroPeriph: begin
           // todo: check that the direction is read.
           direction <= WriteMask;
-          input_byte_buffer <= one_zero;
+          transmitter_byte_buffer <= one_zero;
           byte_transmitter_enable <= 1;
           byte_count <= 0;
           current_state <= WriteBuffer;
@@ -119,18 +147,21 @@ module i2c_periph (
         ZeroOnePeriph: begin
           // todo: check that the direction is read.
           direction <= WriteMask;
-          input_byte_buffer <= zero_one;
+          transmitter_byte_buffer <= zero_one;
           byte_transmitter_enable <= 1;
           byte_count <= 0;
           current_state <= WriteBuffer;
         end
         WriteBuffer: begin
-          if (byte_count == 8) begin
+          if (byte_count == 7) begin
             byte_transmitter_enable <= 0;
             current_state <= Stop;
           end else begin
             byte_count <= byte_count + 1;
           end
+        end
+        BadAddress: begin
+          current_state <= Reset;
         end
         Reset: begin
           address <= 7'b000_0000;

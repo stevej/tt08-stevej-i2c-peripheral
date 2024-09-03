@@ -9,22 +9,25 @@ module byte_transmitter (
     input clk,
     input reset,
     input enable,
-    input [7:0] in,  // byte_buffer
-    output out
+    input wire [7:0] in,  // byte_buffer
+    output wire out
 );
 
-  reg [7:0] in_buffer;
-  reg data;
-  assign out = data;
+  reg [2:0] byte_count;
+  reg r_out;
+  assign out = r_out;
 
   always @(posedge clk) begin
     if (reset) begin
-      in_buffer <= in;
+      byte_count <= 3'b000;
+      r_out <= 0;
     end else begin
       if (enable) begin
-        data <= in_buffer[7];
-        in_buffer[7:1] <= in_buffer[6:0];
-        in_buffer[0] <= 0;
+        r_out <= in[byte_count];  // when in[byte_count] is 1, r_out becomes X as it conflicts with 
+        byte_count <= byte_count + 1;
+      end else begin
+        // once enable is pulled low, reset byte count for next use.
+        byte_count <= 0;
       end
     end
   end
