@@ -16,10 +16,7 @@ module i2c_periph (
 );
 
   localparam [3:0] Stop = 4'b0001;  // 1
-  localparam [3:0] Start = 4'b0010;  // 2
   localparam [3:0] AddressAndRw = 4'b0011;  // 3
-  localparam [3:0] Dispatch = 4'b0100;  // 4
-  localparam [3:0] Fnv1aPeriph = 4'b0111;  // 7
   localparam [3:0] WriteBuffer = 4'b1001;  // 9
   localparam [3:0] Reset = 4'b1010;  // 10
   localparam [3:0] BadAddress = 4'b1011;  // 11
@@ -37,7 +34,6 @@ module i2c_periph (
   reg read_request;
   reg transmitter_channel;
   reg ack_channel;
-  reg [7:0] fnv_buffer;
   reg [7:0] bad_address;
 
   reg r_output_selector_transmitter;  // 1 means transmitter, 0 means send an ack
@@ -84,21 +80,13 @@ module i2c_periph (
       one_zero <= 8'b1010_1010;
       zero_one <= 8'b0101_0101;
       bad_address <= 8'b1100_1100;
-      fnv_buffer <= 8'b0000_0000;
     end else begin
       case (current_state)
         Stop: begin
           if (last_sda == 0 && read_channel == 1) begin
-            current_state <= Start;
+            current_state <= AddressAndRw;
           end else begin
             current_state <= Stop;
-          end
-        end
-        Start: begin
-          if (address > 7'b000_0000) begin
-            current_state <= Dispatch;
-          end else begin
-            current_state <= AddressAndRw;
           end
         end
         AddressAndRw: begin
@@ -122,6 +110,13 @@ module i2c_periph (
                   byte_count <= 0;
                   current_state <= WriteBuffer;
                 end
+                7'h55: begin
+                  direction <= WriteMask;
+                  transmitter_byte_buffer <= one_zero;
+                  byte_transmitter_enable <= 1;
+                  byte_count <= 0;
+                  current_state <= WriteBuffer;
+                end
                 default: begin  // Bad Address
                   direction <= WriteMask;
                   transmitter_byte_buffer <= bad_address;
@@ -132,65 +127,6 @@ module i2c_periph (
               endcase
             end
           end
-        end
-        // Now that we have the address, we can read and write bytes per each peripherals needs.
-        Dispatch: begin  // DEAD CODE NOW
-          if (read_request) begin
-            case (address)
-              7'h2A: begin  // This is our ZeroOnePeriph peripheral.
-                direction <= WriteMask;
-                transmitter_byte_buffer <= zero_one;
-                byte_transmitter_enable <= 1;
-                byte_count <= 0;
-                current_state <= WriteBuffer;
-              end
-              7'h55: begin
-                direction <= WriteMask;
-                transmitter_byte_buffer <= one_zero;
-                byte_transmitter_enable <= 1;
-                byte_count <= 0;
-                current_state <= WriteBuffer;
-              end
-              7'h3E: begin  // FNV-1a peripheral
-                direction <= WriteMask;
-                transmitter_byte_buffer <= fnv_buffer;
-                // TODO: reset FNV-1a peripheral
-                byte_transmitter_enable <= 1;
-                byte_count <= 0;
-                current_state <= WriteBuffer;
-              end
-              default: begin  // Bad Address
-                direction <= WriteMask;
-                transmitter_byte_buffer <= bad_address;
-                byte_transmitter_enable <= 1;
-                byte_count <= 0;
-                current_state <= WriteBuffer;
-              end
-            endcase
-          end else begin  // write request
-            case (address)
-              7'h3E: begin
-              end
-              default: current_state <= BadAddress;
-            endcase
-            // We don't support write requests at this stage of development but it would be here.
-            // enable receiver and read some bytes.
-            current_state <= Dispatch;
-          end
-        end
-        Fnv1aPeriph: begin  // TODO: this is unreachable, inline logic into Dispatch
-          case (read_request)
-            1: begin  // Read request
-              direction <= WriteMask;
-              transmitter_byte_buffer <= fnv_buffer;
-              byte_transmitter_enable <= 1;
-              byte_count <= 0;
-              current_state <= WriteBuffer;
-            end
-            default: begin  // Write request
-              current_state <= Reset;
-            end
-          endcase
         end
         WriteBuffer: begin
           if (byte_count == 7) begin
