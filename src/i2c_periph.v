@@ -19,8 +19,6 @@ module i2c_periph (
   localparam [3:0] Start = 4'b0010;  // 2
   localparam [3:0] AddressAndRw = 4'b0011;  // 3
   localparam [3:0] Dispatch = 4'b0100;  // 4
-  localparam [3:0] OneZeroPeriph = 4'b0101;  // 5
-  localparam [3:0] ZeroOnePeriph = 4'b0110;  // 6
   localparam [3:0] Fnv1aPeriph = 4'b0111;  // 7
   localparam [3:0] WriteBuffer = 4'b1001;  // 9
   localparam [3:0] Reset = 4'b1010;  // 10
@@ -39,6 +37,8 @@ module i2c_periph (
   reg read_request;
   reg transmitter_channel;
   reg ack_channel;
+  reg [7:0] fnv_buffer;
+  reg [7:0] bad_address;
 
   reg r_output_selector_transmitter;  // 1 means transmitter, 0 means send an ack
   mux_2_1 output_mux (
@@ -83,6 +83,8 @@ module i2c_periph (
       address <= 7'b000_0000;
       one_zero <= 8'b1010_1010;
       zero_one <= 8'b0101_0101;
+      bad_address <= 8'b1100_1100;
+      fnv_buffer <= 8'b0000_0000;
     end else begin
       case (current_state)
         Stop: begin
@@ -111,11 +113,28 @@ module i2c_periph (
             address <= receiver_byte_buffer[7:1];
             read_request <= receiver_byte_buffer[0];
             byte_receiver_enable <= 0;
-            current_state <= Dispatch;
+            if (read_request) begin
+              case (address)
+                7'h2A: begin  // This is our ZeroOnePeriph peripheral.
+                  direction <= WriteMask;
+                  transmitter_byte_buffer <= zero_one;
+                  byte_transmitter_enable <= 1;
+                  byte_count <= 0;
+                  current_state <= WriteBuffer;
+                end
+                default: begin  // Bad Address
+                  direction <= WriteMask;
+                  transmitter_byte_buffer <= bad_address;
+                  byte_transmitter_enable <= 1;
+                  byte_count <= 0;
+                  current_state <= WriteBuffer;
+                end
+              endcase
+            end
           end
         end
         // Now that we have the address, we can read and write bytes per each peripherals needs.
-        Dispatch: begin
+        Dispatch: begin  // DEAD CODE NOW
           if (read_request) begin
             case (address)
               7'h2A: begin  // This is our ZeroOnePeriph peripheral.
@@ -125,32 +144,53 @@ module i2c_periph (
                 byte_count <= 0;
                 current_state <= WriteBuffer;
               end
-              7'h55:   current_state <= ZeroOnePeriph;
-              7'h3F:   current_state <= Fnv1aPeriph;
+              7'h55: begin
+                direction <= WriteMask;
+                transmitter_byte_buffer <= one_zero;
+                byte_transmitter_enable <= 1;
+                byte_count <= 0;
+                current_state <= WriteBuffer;
+              end
+              7'h3E: begin  // FNV-1a peripheral
+                direction <= WriteMask;
+                transmitter_byte_buffer <= fnv_buffer;
+                // TODO: reset FNV-1a peripheral
+                byte_transmitter_enable <= 1;
+                byte_count <= 0;
+                current_state <= WriteBuffer;
+              end
+              default: begin  // Bad Address
+                direction <= WriteMask;
+                transmitter_byte_buffer <= bad_address;
+                byte_transmitter_enable <= 1;
+                byte_count <= 0;
+                current_state <= WriteBuffer;
+              end
+            endcase
+          end else begin  // write request
+            case (address)
+              7'h3E: begin
+              end
               default: current_state <= BadAddress;
             endcase
-          end else begin
             // We don't support write requests at this stage of development but it would be here.
             // enable receiver and read some bytes.
             current_state <= Dispatch;
           end
         end
-        // Will this break because I'm not doing anything with the ACK after a byte?
-        OneZeroPeriph: begin
-          // todo: check that the direction is read.
-          direction <= WriteMask;
-          transmitter_byte_buffer <= one_zero;
-          byte_transmitter_enable <= 1;
-          byte_count <= 0;
-          current_state <= WriteBuffer;
-        end
-        ZeroOnePeriph: begin
-          // todo: check that the direction is read.
-          direction <= WriteMask;
-          transmitter_byte_buffer <= zero_one;
-          byte_transmitter_enable <= 1;
-          byte_count <= 0;
-          current_state <= WriteBuffer;
+        Fnv1aPeriph: begin  // TODO: this is unreachable, inline logic into Dispatch
+          case (read_request)
+            1: begin  // Read request
+              direction <= WriteMask;
+              transmitter_byte_buffer <= fnv_buffer;
+              byte_transmitter_enable <= 1;
+              byte_count <= 0;
+              current_state <= WriteBuffer;
+            end
+            default: begin  // Write request
+              current_state <= Reset;
+            end
+          endcase
         end
         WriteBuffer: begin
           if (byte_count == 7) begin
@@ -161,7 +201,7 @@ module i2c_periph (
           end
         end
         BadAddress: begin
-          current_state <= Reset;
+          current_state <= Stop;
         end
         Reset: begin
           address <= 7'b000_0000;

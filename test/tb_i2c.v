@@ -64,9 +64,6 @@ module tb_i2c ();
     #2 force SDA = 1;
     #2 force SDA = 0;
     #2 force SDA = 1;
-    #2 force SDA = 1;
-    #2 force SDA = 1;
-    #2 force SDA = 1;
 
     // Are we wanting to read or write to/from the device?
     $display("Read/Write %h SDA: %h", readWrite, SDA);
@@ -76,7 +73,7 @@ module tb_i2c ();
     release SDA;
 
     $display("SDA: %h", SDA);
-    #2;  // Wait for ACK bit
+    #3
 
     for (ii = 0; ii < 8; ii = ii + 1) begin
       //$display("Data SDA %h to %h", SDA, dataToSend[ii]);
@@ -85,8 +82,8 @@ module tb_i2c ();
       test_data[ii] = SDA;
     end
 
-    if (test_data != dataToSend) begin
-      $display("ASSERTION FAILED data not equal: %h != %h", test_data, dataToSend);
+    if (test_data != 8'h55) begin
+      $display("ASSERTION FAILED data not equal: %h != %h", test_data, 8'h55);
       $finish();
     end
 
@@ -98,7 +95,6 @@ module tb_i2c ();
     // Force SDA high again, we are done
     #2 force SDA = 1;
 
-    #100;
     $finish();
   end
 
