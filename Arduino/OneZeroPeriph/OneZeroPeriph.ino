@@ -29,7 +29,6 @@ void loop()
 {
   if (ran == 0) {
     Serial.println("i2c transmitter requesting from peripheral");
-    //Wire.beginTransmission(0x2A);
 
     Wire.requestFrom(0x2A, 1);
     if (Wire.available())
@@ -41,7 +40,6 @@ void loop()
     Serial.println(i2c_rcv, BIN);
     ran = 1;
     Serial.println("ending transmission");
-   // Wire.endTransmission();
   }
 
     // blink an LED to show that we're alive.
